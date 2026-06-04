@@ -22,7 +22,7 @@ app.post('/api/contact', async (req, res) => {
       sender: { email: process.env.EMAIL_USER, name: name },
       to: [{ email: process.env.EMAIL_USER, name: 'Admin' }],
       replyTo: { email: email, name: name },
-      subject: `${subject}`,
+      subject: `${subject} [Je viens du portfolio]`,
       textContent: `Nom: ${name}\nEmail: ${email}\nSujet: ${subject}\nMessage:\n${message}`,
     }, {
       headers: {
