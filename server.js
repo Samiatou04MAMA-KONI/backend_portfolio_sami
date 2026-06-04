@@ -1,5 +1,5 @@
 const express = require('express');
-const nodemailer = require('nodemailer');
+const axios = require('axios');   // IMPORTANT : installez axios d'abord
 const cors = require('cors');
 const dotenv = require('dotenv');
 
@@ -9,21 +9,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Fonction pour créer un nouveau transporteur à chaque requête (évite les connexions périmées)
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    // Timeout plus long (60 secondes)
-    connectionTimeout: 60000,
-    greetingTimeout: 60000,
-    socketTimeout: 60000,
-  });
-};
-
 app.post('/api/contact', async (req, res) => {
   const { name, email, subject, message } = req.body;
 
@@ -31,26 +16,30 @@ app.post('/api/contact', async (req, res) => {
     return res.status(400).json({ error: 'Tous les champs sont obligatoires.' });
   }
 
-  const mailOptions = {
-    from: email,
-    to: process.env.EMAIL_USER,
-    replyTo: email,
-    subject: `[Portfolio] ${subject}`,
-    text: `Nom: ${name}\nEmail: ${email}\nSujet: ${subject}\nMessage:\n${message}`,
-  };
-
   try {
-    // Créer un nouveau transporteur pour chaque envoi
-    const transporter = createTransporter();
-    await transporter.sendMail(mailOptions);
-    console.log(`Email envoyé à ${process.env.EMAIL_USER} de la part de ${email}`);
+    // Appel à l'API Brevo (port 443, non bloqué)
+    const response = await axios.post('https://api.brevo.com/v3/smtp/email', {
+      sender: { email: process.env.EMAIL_USER, name: 'Mon Portfolio' },
+      to: [{ email: process.env.EMAIL_USER, name: 'Admin' }],
+      replyTo: { email: email, name: name },
+      subject: `[Portfolio] ${subject}`,
+      textContent: `Nom: ${name}\nEmail: ${email}\nSujet: ${subject}\nMessage:\n${message}`,
+    }, {
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log('Email envoyé via Brevo:', response.data);
     res.status(200).json({ message: 'Votre message a été envoyé avec succès.' });
   } catch (error) {
-    console.error('Erreur détaillée:', error);
-    // Renvoyer un message plus précis si possible
+    console.error('Erreur Brevo:', error.response?.data || error.message);
     let errorMessage = 'Erreur interne du serveur. Veuillez réessayer.';
-    if (error.code === 'ECONNECTION' || error.code === 'ETIMEDOUT') {
-      errorMessage = 'Problème de connexion au serveur email. Réessayez dans quelques instants.';
+    if (error.response?.status === 401) {
+      errorMessage = 'Clé API Brevo invalide.';
+    } else if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      errorMessage = 'Problème de connexion au service d’email. Réessayez dans quelques instants.';
     }
     res.status(500).json({ error: errorMessage });
   }
