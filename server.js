@@ -19,7 +19,7 @@ app.post('/api/contact', async (req, res) => {
   try {
     // Appel à l'API Brevo (port 443, non bloqué)
     const response = await axios.post('https://api.brevo.com/v3/smtp/email', {
-      sender: { email: process.env.EMAIL_USER, name: 'Mon Portfolio' },
+      sender: { email: process.env.EMAIL_USER, name: name },
       to: [{ email: process.env.EMAIL_USER, name: 'Admin' }],
       replyTo: { email: email, name: name },
       subject: `[Portfolio] ${subject}`,
